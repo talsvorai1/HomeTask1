@@ -8,12 +8,12 @@ metadata:
 spec:
   selector:
     app: my-app
-#Creating LoadBalancer that exposes the app on port 80
+#Creating LoadBalancer that exposes the app on port 443
 #and forwards the traffic to the pods on port 30100
   type: LoadBalancer
   ports:
   - nodePort : 30100
     protocol: TCP
-    port: 80 
+    port: 443 
     targetPort: 443
   
