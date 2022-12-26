@@ -14,7 +14,7 @@ spec:
     metadata:
       labels:
         app: my-app
-#configuring containers
+#Deploying new image from ECR
     spec:
       containers:
       - name: my-container
