@@ -1,0 +1,76 @@
+pipeline {
+    /*Accessing build server via ssh*/
+    agent {
+        label 'build'
+    }
+    stages {
+	       
+        stage('Gitlab credentials') {
+            steps {
+                echo 'Working on master branch'
+                    git branch: 'master', credentialsId: 'GitLab credentials', url: 'http://52.20.154.51/gitlab-instance-e8513808/leumi1'            
+	    }
+        }
+
+	stage('Clean') {
+            steps {
+	        echo 'Removing containers and  images'
+		
+		sh 'docker container prune --force'
+		sh 'docker image prune --force'
+	    }
+        }
+
+	stage('Build') {
+	    steps {
+	        echo 'Building docker image'
+		sh 'docker build -t wrecking_image .'
+		echo 'running container with image'
+		sh 'docker run -p 443:443 -d wrecking_image'
+		sh 'docker stop $(docker ps -aq)'		
+            }
+        }
+
+        stage('unittest') {
+            steps {
+                echo 'Testing app connectivity'
+                sh 'python3 -m unittest my_unittest.py'
+	    }
+        }
+
+        stage('push image to ECR') {
+            steps {
+                echo 'Pushing new artifact to AWS Elastic Container Registry'
+		sh 'aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 642341975645.dkr.ecr.us-east-1.amazonaws.com'
+		sh 'docker tag wrecking_image 642341975645.dkr.ecr.us-east-1.amazonaws.com/leumi_task1:latest'
+		sh 'docker push 642341975645.dkr.ecr.us-east-1.amazonaws.com/leumi_task1:latest'
+            }
+        }
+  
+        stage('deployment') {
+            steps {
+                echo 'Pulling new artifact and running the container in a pod on the AWS Elastic Kubernetes Service cluser'
+                echo 'Accessing deployment server'
+		script {
+		    sshagent(['DEPLOY_KEY']) {
+                        sh '''
+		        ssh -o StrictHostKeyChecking=no -l ubuntu 54.225.239.64 << EOF
+			aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 642341975645.dkr.ecr.us-east-1.amazonaws.com
+			docker pull 642341975645.dkr.ecr.us-east-1.amazonaws.com/leumi_task1:latest
+			kubectl apply -f my-deployment.yaml
+                        kubectl apply -f my-service.yaml
+			'''
+		    }
+		}
+            }
+        }
+    }
+    post {
+        failure {
+	    slackSend channel: "devops-alerts", message: "Build Failed: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
+        }
+	success {
+            slackSend channel: "succeeded-build", message: "Build Successful: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
+	}
+    }
+}

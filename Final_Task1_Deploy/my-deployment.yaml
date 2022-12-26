@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+#creating deployment
+kind: Deployment
+metadata:
+  name: my-deployment
+  labels:
+    app: my-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+#configuring containers
+    spec:
+      containers:
+      - name: my-container
+        image: 642341975645.dkr.ecr.us-east-1.amazonaws.com/leumi_task1:latest
+        ports:
+        - containerPort: 443
+
